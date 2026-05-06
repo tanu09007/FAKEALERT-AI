@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import Tesseract from 'tesseract.js';
 import { analyzeClaim, scrapeUrl } from '../api';
 
-const InputSection = ({ onAnalysisComplete }) => {
+const InputSection = ({ onAnalysisComplete, onStartLoading, onTabChange }) => {
   const [activeTab, setActiveTab] = useState('text');
   const [textInput, setTextInput] = useState('');
   const [urlInput, setUrlInput] = useState('');
@@ -35,6 +35,7 @@ const InputSection = ({ onAnalysisComplete }) => {
       toast.error("Please enter a claim");
       return;
     }
+    if (onStartLoading) onStartLoading();
     setLoading(true);
     setStatusMessage("Analysing claim...");
     
@@ -58,6 +59,7 @@ const InputSection = ({ onAnalysisComplete }) => {
       toast.error("Please enter a valid URL starting with https://");
       return;
     }
+    if (onStartLoading) onStartLoading();
     setLoading(true);
     setStatusMessage("Extracting text from URL...");
     
@@ -68,7 +70,8 @@ const InputSection = ({ onAnalysisComplete }) => {
         toast.error(scrapeResult.message);
         setLoading(false);
         setStatusMessage('');
-        return; // Stop. Do not call analyse.
+        if (onAnalysisComplete) onAnalysisComplete({ error: true });
+        return; 
       }
       
       // Step 2: Analyse extracted text
@@ -98,6 +101,7 @@ const InputSection = ({ onAnalysisComplete }) => {
       return;
     }
     
+    if (onStartLoading) onStartLoading();
     setLoading(true);
     setStatusMessage("Reading text from image...");
     
@@ -145,19 +149,19 @@ const InputSection = ({ onAnalysisComplete }) => {
       {/* Tabs Header */}
       <div className="flex border-b border-gray-100 bg-gray-50/50">
         <button 
-          onClick={() => setActiveTab('text')}
+          onClick={() => { setActiveTab('text'); if (onTabChange) onTabChange(); }}
           className={`flex-1 py-4 text-sm font-bold tracking-wide transition-colors ${activeTab === 'text' ? 'text-green-700 border-b-2 border-green-600 bg-white' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
         >
           📝 TEXT
         </button>
         <button 
-          onClick={() => setActiveTab('url')}
+          onClick={() => { setActiveTab('url'); if (onTabChange) onTabChange(); }}
           className={`flex-1 py-4 text-sm font-bold tracking-wide transition-colors ${activeTab === 'url' ? 'text-green-700 border-b-2 border-green-600 bg-white' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
         >
           🔗 URL
         </button>
         <button 
-          onClick={() => setActiveTab('image')}
+          onClick={() => { setActiveTab('image'); if (onTabChange) onTabChange(); }}
           className={`flex-1 py-4 text-sm font-bold tracking-wide transition-colors ${activeTab === 'image' ? 'text-green-700 border-b-2 border-green-600 bg-white' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
         >
           🖼️ IMAGE

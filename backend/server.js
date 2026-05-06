@@ -4,10 +4,8 @@ require('dotenv').config();
 
 const app = express();
 
-// Set up CORS to only allow the frontend origin
-app.use(cors({
-  origin: 'http://localhost:3000'
-}));
+// Allow all origins during development
+app.use(cors());
 
 // Set express JSON limit to 10mb to handle base64 image uploads (Tesseract OCR)
 app.use(express.json({ limit: '10mb' }));

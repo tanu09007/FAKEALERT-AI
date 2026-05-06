@@ -23,44 +23,44 @@ router.post('/', async (req, res) => {
     // ══════════════════════════════════
     // STEP 1 — GROQ BRAIN CALL 1 
     // ══════════════════════════════════
-    let step1Model = type === 'image' ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'llama3-70b-8192';
+    let step1Model = type === 'image' && imageBase64 ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile';
     let response1;
 
-    const step1Prompt = `Read this claim carefully:
-CLAIM: ${content}
+    const userMessage = {
+      role: 'user',
+      content: [
+        { type: 'text', text: `Read this claim carefully:\nCLAIM: ${content}\n\nReturn ONLY this JSON:\n{\n  "keywords": "comma separated search terms for news",\n  "climate_variable": "temperature or rainfall or sea_level or co2 or floods or drought",\n  "core_claim": "one sentence of what is being claimed"\n}` }
+      ]
+    };
 
-Return ONLY this JSON:
-{
-  "keywords": "comma separated search terms for news",
-  "climate_variable": "temperature or rainfall or sea_level or co2 or floods or drought",
-  "core_claim": "one sentence of what is being claimed"
-}`;
+    // Add image if it's a vision call
+    if (type === 'image' && imageBase64) {
+      userMessage.content.push({
+        type: 'image_url',
+        image_url: { url: imageBase64 }
+      });
+    }
 
     try {
       response1 = await groq.chat.completions.create({
         messages: [
           { role: 'system', content: 'You are a climate fact-checking assistant.\nYour job is to understand claims only.\nDo not give verdicts yet.\nReturn ONLY raw JSON. No markdown. No backticks.' },
-          { role: 'user', content: step1Prompt }
+          userMessage
         ],
         model: step1Model,
         temperature: 0.1,
       });
     } catch (groqError) {
-      if (type === 'image') {
-        // Fallback to text model if vision model is unavailable
-        console.log(`[Groq] Vision model unavailable, falling back to llama3-70b-8192`);
-        step1Model = 'llama3-70b-8192';
-        response1 = await groq.chat.completions.create({
-          messages: [
-            { role: 'system', content: 'You are a climate fact-checking assistant.\nYour job is to understand claims only.\nDo not give verdicts yet.\nReturn ONLY raw JSON. No markdown. No backticks.' },
-            { role: 'user', content: step1Prompt }
-          ],
-          model: step1Model,
-          temperature: 0.1,
-        });
-      } else {
-        throw groqError;
-      }
+      console.error("[Groq Error]", groqError.message);
+      // Fallback to text model
+      response1 = await groq.chat.completions.create({
+        messages: [
+          { role: 'system', content: 'You are a climate fact-checking assistant.\nYour job is to understand claims only.\nDo not give verdicts yet.\nReturn ONLY raw JSON. No markdown. No backticks.' },
+          { role: 'user', content: `Read this claim carefully:\nCLAIM: ${content}\n\nReturn ONLY this JSON:\n{\n  "keywords": "comma separated search terms for news",\n  "climate_variable": "temperature or rainfall or sea_level or co2 or floods or drought",\n  "core_claim": "one sentence of what is being claimed"\n}` }
+        ],
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.1,
+      });
     }
 
     // Safe JSON Parsing Step 1
@@ -126,7 +126,7 @@ Return ONLY this exact JSON:
         { role: 'system', content: 'You are a strict climate misinformation fact-checker.\nYou have been given a claim and real verified data.\nCompare them carefully and give a verdict.\nReturn ONLY raw JSON. No markdown. No backticks.' },
         { role: 'user', content: step3Prompt }
       ],
-      model: 'llama3-70b-8192', // Fact checking requires the strongest reasoning model
+      model: 'llama-3.3-70b-versatile', // Fact checking requires the strongest reasoning model
       temperature: 0.1,
     });
 
@@ -167,6 +167,7 @@ Return ONLY this exact JSON:
     // ══════════════════════════════════
     return res.json({
       ...parsed,
+      claim_text: content,
       climate_data: climateData.data,
       news_articles: newsData.data.articles
     });
