@@ -173,11 +173,11 @@ Return ONLY this exact JSON:
     });
 
   } catch (error) {
-    console.error("[Analyse Route] Error:", error.message);
-    // Graceful error fallback for frontend
+    console.error("[Analyse Route] CRITICAL ERROR:", error.message);
+    
     return res.status(200).json({
       error: true,
-      message: "Analysis failed. Please try again."
+      message: `Analysis failed: ${error.message}. Please try a smaller image or shorter text.`
     });
   }
 });

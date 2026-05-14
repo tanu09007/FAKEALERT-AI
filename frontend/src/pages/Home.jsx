@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import InputSection from '../components/InputSection';
 import LoadingState from '../components/LoadingState';
 import ResultCard from '../components/ResultCard';
+import ClimateIntelligence from '../components/ClimateIntelligence';
 
 const Home = () => {
   const [result, setResult] = useState(null);
@@ -46,7 +47,12 @@ const Home = () => {
       </div>
 
       <main className="w-full max-w-4xl space-y-12">
-        {/* 1. Input Section (Always at top) */}
+        {/* 0. Live Intelligence Context */}
+        <section>
+          <ClimateIntelligence />
+        </section>
+
+        {/* 1. Input Section */}
         <section>
           <InputSection 
             onAnalysisComplete={handleAnalysisComplete} 

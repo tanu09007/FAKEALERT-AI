@@ -49,12 +49,12 @@ const DangerMeter = ({ fake_percentage, fake_breakdown }) => {
 
       {/* B) Breakdown Bars */}
       <div className="space-y-4">
-        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Detection Breakdown</h4>
+        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Why is this flagged?</h4>
         <div className="grid grid-cols-1 gap-3">
-          <ScoreBar label="Climate Data" score={fake_breakdown?.climate_data_contradiction || 0} max={40} color="bg-blue-500" />
-          <ScoreBar label="News Sources" score={fake_breakdown?.news_contradiction || 0} max={30} color="bg-indigo-500" />
-          <ScoreBar label="Language" score={fake_breakdown?.emotional_language || 0} max={20} color="bg-purple-500" />
-          <ScoreBar label="Source" score={fake_breakdown?.source_credibility || 0} max={10} color="bg-pink-500" />
+          <ScoreBar label="Scientific Accuracy" score={fake_breakdown?.climate_data_contradiction || 0} max={40} color="bg-blue-500" />
+          <ScoreBar label="News Media Support" score={fake_breakdown?.news_contradiction || 0} max={30} color="bg-indigo-500" />
+          <ScoreBar label="Emotional Tone" score={fake_breakdown?.emotional_language || 0} max={20} color="bg-purple-500" />
+          <ScoreBar label="Source Trustworthiness" score={fake_breakdown?.source_credibility || 0} max={10} color="bg-pink-500" />
         </div>
       </div>
     </div>

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 
 const messages = [
-  "Reading the claim...",
-  "Fetching real climate data...",
-  "Cross-checking with news sources...",
-  "Comparing with real evidence...",
-  "Calculating fake percentage..."
+  "Reading your claim...",
+  "Checking scientific databases...",
+  "Verifying with news reports...",
+  "Looking for real evidence...",
+  "Calculating trust score..."
 ];
 
 const LoadingState = () => {

@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import toast from 'react-hot-toast';
 import Tesseract from 'tesseract.js';
-import { analyzeClaim, scrapeUrl } from '../api';
+import { analyzeClaim } from '../api';
 
 const InputSection = ({ onAnalysisComplete, onStartLoading, onTabChange }) => {
   const [activeTab, setActiveTab] = useState('text');
   const [textInput, setTextInput] = useState('');
-  const [urlInput, setUrlInput] = useState('');
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -52,48 +51,7 @@ const InputSection = ({ onAnalysisComplete, onStartLoading, onTabChange }) => {
   };
 
   // ==========================================
-  // TAB 2: URL SUBMISSION
-  // ==========================================
-  const handleUrlSubmit = async () => {
-    if (!urlInput.trim() || !urlInput.startsWith('https://')) {
-      toast.error("Please enter a valid URL starting with https://");
-      return;
-    }
-    if (onStartLoading) onStartLoading();
-    setLoading(true);
-    setStatusMessage("Extracting text from URL...");
-    
-    try {
-      // Step 1: Scrape text
-      const scrapeResult = await scrapeUrl(urlInput);
-      if (scrapeResult.error) {
-        toast.error(scrapeResult.message);
-        setLoading(false);
-        setStatusMessage('');
-        if (onAnalysisComplete) onAnalysisComplete({ error: true });
-        return; 
-      }
-      
-      // Step 2: Analyse extracted text
-      setStatusMessage("Analysing extracted text...");
-      const result = await analyzeClaim({ 
-        type: 'url', 
-        content: scrapeResult.extractedText,
-        sourceUrl: scrapeResult.sourceUrl
-      });
-      
-      if (result.error) toast.error(result.message);
-      else if (onAnalysisComplete) onAnalysisComplete(result);
-    } catch (error) {
-      toast.error("Failed to process URL.");
-    } finally {
-      setLoading(false);
-      setStatusMessage('');
-    }
-  };
-
-  // ==========================================
-  // TAB 3: IMAGE SUBMISSION
+  // TAB 2: IMAGE SUBMISSION
   // ==========================================
   const handleImageSubmit = async () => {
     if (!imageFile) {
@@ -139,7 +97,6 @@ const InputSection = ({ onAnalysisComplete, onStartLoading, onTabChange }) => {
 
   const handleSubmit = () => {
     if (activeTab === 'text') handleTextSubmit();
-    else if (activeTab === 'url') handleUrlSubmit();
     else if (activeTab === 'image') handleImageSubmit();
   };
 
@@ -153,12 +110,6 @@ const InputSection = ({ onAnalysisComplete, onStartLoading, onTabChange }) => {
           className={`flex-1 py-4 text-sm font-bold tracking-wide transition-colors ${activeTab === 'text' ? 'text-green-700 border-b-2 border-green-600 bg-white' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
         >
           📝 TEXT
-        </button>
-        <button 
-          onClick={() => { setActiveTab('url'); if (onTabChange) onTabChange(); }}
-          className={`flex-1 py-4 text-sm font-bold tracking-wide transition-colors ${activeTab === 'url' ? 'text-green-700 border-b-2 border-green-600 bg-white' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
-        >
-          🔗 URL
         </button>
         <button 
           onClick={() => { setActiveTab('image'); if (onTabChange) onTabChange(); }}
@@ -178,20 +129,6 @@ const InputSection = ({ onAnalysisComplete, onStartLoading, onTabChange }) => {
               placeholder="Paste or type a climate claim here..."
               value={textInput}
               onChange={(e) => setTextInput(e.target.value)}
-              disabled={loading}
-            />
-          </div>
-        )}
-
-        {/* URL Input Tab */}
-        {activeTab === 'url' && (
-          <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <input
-              type="url"
-              className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all placeholder:text-gray-400 text-gray-800"
-              placeholder="Paste a news article URL here..."
-              value={urlInput}
-              onChange={(e) => setUrlInput(e.target.value)}
               disabled={loading}
             />
           </div>

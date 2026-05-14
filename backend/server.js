@@ -7,15 +7,19 @@ const app = express();
 // Allow all origins during development
 app.use(cors());
 
-// Set express JSON limit to 10mb to handle base64 image uploads (Tesseract OCR)
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+// Set express JSON limit to 50mb to handle high-res base64 image uploads
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Mount Routes
 app.use('/api/analyse', require('./routes/analyse'));
 app.use('/api/news', require('./routes/news'));
 app.use('/api/climate', require('./routes/climate'));
 app.use('/api/scrape', require('./routes/scrape'));
+app.use('/api/weather', require('./routes/weather'));
+app.use('/api/alerts', require('./routes/alerts'));
+app.use('/api/disasters', require('./routes/disasters'));
+app.use('/api/india-alerts', require('./routes/india_alerts'));
 
 // Global Error Handler (MUST be at the very bottom)
 app.use((err, req, res, next) => {

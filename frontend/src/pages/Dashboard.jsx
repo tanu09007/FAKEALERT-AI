@@ -11,35 +11,40 @@ const Dashboard = () => {
     topTopic: 'None',
     protectedCount: 0,
     chartData: [],
-    recentClaims: []
+    allClaims: [] // Store everything
   });
   const [loading, setLoading] = useState(true);
+  const [selectedClaim, setSelectedClaim] = useState(null); // For modal detail view
 
   const fetchStats = async () => {
     try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const lastWeek = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-
-      // Query 1 & 2: Get claims from last 7 days to calculate everything locally (to save API calls)
-      const { data: allRecent, error: err1 } = await supabase
+      // Fetch ALL claims to calculate all stats from one source of truth
+      const { data: allClaims, error: err } = await supabase
         .from('claims')
-        .select('verdict, created_at, topic')
-        .gte('created_at', lastWeek.toISOString());
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      if (err1) throw err1;
+      if (err) throw err;
+      if (!allClaims || allClaims.length === 0) {
+        setLoading(false);
+        return;
+      }
 
-      // Filter Today's Stats
-      const todayStr = today.toISOString().split('T')[0];
-      const todayClaims = allRecent.filter(c => c.created_at.startsWith(todayStr));
-      const falseToday = todayClaims.filter(c => c.verdict === 'FALSE').length;
-      const misleadingToday = todayClaims.filter(c => c.verdict === 'MISLEADING').length;
+      const now = new Date();
+      const todayStart = new Date(now.setHours(0, 0, 0, 0));
+      const lastWeekStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-      // Calculate Top Topics (Query 2)
+      // 1. Calculate Today's Stats (Proper Date Comparison)
+      const todayClaims = allClaims.filter(c => new Date(c.created_at) >= todayStart);
+      const falseToday = todayClaims.filter(c => c.verdict?.toUpperCase() === 'FALSE').length;
+      const misleadingToday = todayClaims.filter(c => c.verdict?.toUpperCase() === 'MISLEADING').length;
+
+      // 2. Calculate Top Topics (From all time or last week)
       const topicMap = {};
-      allRecent.forEach(c => {
-        if (!c.topic) return;
-        topicMap[c.topic] = (topicMap[c.topic] || 0) + 1;
+      allClaims.forEach(c => {
+        if (!c.topic || c.topic === 'N/A') return;
+        const t = c.topic.toLowerCase().trim();
+        topicMap[t] = (topicMap[t] || 0) + 1;
       });
 
       const chartData = Object.entries(topicMap)
@@ -49,22 +54,18 @@ const Dashboard = () => {
 
       const topTopic = chartData[0]?.name || 'N/A';
 
-      // Query 3: Most Recent 10 Claims
-      const { data: recentClaims, error: err3 } = await supabase
-        .from('claims')
-        .select('created_at, verdict, topic, fake_percentage')
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (err3) throw err3;
+      // 3. Calculate Global Protection (All time)
+      const totalFalseOrMisleading = allClaims.filter(c => 
+        ['FALSE', 'MISLEADING'].includes(c.verdict?.toUpperCase())
+      ).length;
 
       setStats({
         falseToday,
         misleadingToday,
         topTopic,
-        protectedCount: (falseToday + misleadingToday) * 230,
+        protectedCount: totalFalseOrMisleading * 230,
         chartData,
-        recentClaims
+        allClaims
       });
     } catch (error) {
       console.error("Dashboard Fetch Error:", error);
@@ -101,11 +102,11 @@ const Dashboard = () => {
         <StatCard title="Misleading Today" value={stats.misleadingToday} color="text-orange-500" icon="🟠" />
         <StatCard title="Most Common Topic" value={stats.topTopic} color="text-blue-600" icon="🏷️" />
         <StatCard 
-          title="Potentially Protected" 
+          title="Global Impact" 
           value={stats.protectedCount.toLocaleString()} 
           color="text-green-600" 
           icon="🛡️" 
-          footer="Based on avg 230 shares per social media post"
+          footer="Est. impact: 230 people protected for every false claim caught."
         />
       </div>
 
@@ -151,48 +152,152 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* SECTION 3: Recent Claims Table */}
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-gray-50 flex justify-between items-center">
-          <h3 className="text-lg font-black text-gray-800 uppercase tracking-tight">Recent Fact Checks</h3>
-          <span className="flex h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-gray-50/50 text-[10px] font-black uppercase tracking-widest text-gray-400">
-              <tr>
-                <th className="px-6 py-4">Time</th>
-                <th className="px-6 py-4">Verdict</th>
-                <th className="px-6 py-4">Topic</th>
-                <th className="px-6 py-4">Fake Score</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {stats.recentClaims.map((claim, i) => (
-                <tr key={i} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-6 py-4 text-xs font-bold text-gray-500">
-                    {new Date(claim.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </td>
-                  <td className="px-6 py-4">
-                    <VerdictBadge verdict={claim.verdict} />
-                  </td>
-                  <td className="px-6 py-4 text-sm font-black text-gray-700 capitalize">
-                    {claim.topic}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`text-xs font-black ${claim.fake_percentage > 50 ? 'text-red-600' : 'text-green-600'}`}>
-                      {claim.fake_percentage}%
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* SECTION 3: Historical Fact Checks */}
+      <div className="space-y-8">
+        <h3 className="text-xl font-black text-gray-800 uppercase tracking-tight flex items-center gap-2">
+          Fact Check History <span className="flex h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
+        </h3>
+        
+        {/* Monthly Groups */}
+        {renderMonthlyGroups(stats.allClaims, setSelectedClaim)}
       </div>
+
+      {/* Detail Modal */}
+      {selectedClaim && (
+        <DetailModal claim={selectedClaim} onClose={() => setSelectedClaim(null)} />
+      )}
     </div>
   );
 };
+
+// Helper to group and render by month
+const renderMonthlyGroups = (claims, onSelect) => {
+  const now = new Date();
+  const thisMonth = now.getMonth();
+  const thisYear = now.getFullYear();
+  
+  const groups = {
+    'This Month': [],
+    'Previous Month': [],
+    'Earlier': []
+  };
+
+  claims.forEach(claim => {
+    const d = new Date(claim.created_at);
+    const m = d.getMonth();
+    const y = d.getFullYear();
+
+    if (y === thisYear && m === thisMonth) {
+      groups['This Month'].push(claim);
+    } else if (y === thisYear && m === thisMonth - 1) {
+      groups['Previous Month'].push(claim);
+    } else if (y === thisYear - 1 && thisMonth === 0 && m === 11) {
+       groups['Previous Month'].push(claim); // December of last year
+    } else {
+      groups['Earlier'].push(claim);
+    }
+  });
+
+  return Object.entries(groups).map(([name, items]) => (
+    items.length > 0 && (
+      <div key={name} className="space-y-4">
+        <div className="flex items-center gap-4">
+          <span className="text-xs font-black uppercase tracking-widest text-gray-400 whitespace-nowrap">{name}</span>
+          <div className="h-px w-full bg-gray-100"></div>
+        </div>
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-gray-50/50 text-[10px] font-black uppercase tracking-widest text-gray-400">
+                <tr>
+                  <th className="px-6 py-4">Date</th>
+                  <th className="px-6 py-4">Verdict</th>
+                  <th className="px-6 py-4">Topic</th>
+                  <th className="px-6 py-4">Score</th>
+                  <th className="px-6 py-4">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {items.map((claim, i) => (
+                  <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-6 py-4 text-xs font-bold text-gray-500">
+                      {new Date(claim.created_at).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}
+                    </td>
+                    <td className="px-6 py-4">
+                      <VerdictBadge verdict={claim.verdict} />
+                    </td>
+                    <td className="px-6 py-4 text-sm font-black text-gray-700 capitalize">
+                      {claim.topic}
+                    </td>
+                    <td className="px-6 py-4 text-xs font-black text-red-600">
+                      {claim.fake_percentage}%
+                    </td>
+                    <td className="px-6 py-4">
+                      <button 
+                        onClick={() => onSelect(claim)}
+                        className="text-[10px] font-black uppercase tracking-widest text-green-600 hover:text-green-800 transition-colors"
+                      >
+                        View Proof →
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    )
+  ));
+};
+
+const DetailModal = ({ claim, onClose }) => (
+  <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
+    <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onClose}></div>
+    <div className="relative bg-white w-full max-w-2xl rounded-[40px] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+      <div className="p-8 space-y-8">
+        <div className="flex justify-between items-center">
+          <VerdictBadge verdict={claim.verdict} />
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-3">
+            <label className="text-[10px] font-black uppercase tracking-widest text-red-500">Original Claim (Fake)</label>
+            <div className="p-5 bg-red-50 rounded-3xl border border-red-100 text-sm font-medium text-red-900 italic">
+              "{claim.claim_text}"
+            </div>
+          </div>
+          
+          <div className="space-y-3">
+            <label className="text-[10px] font-black uppercase tracking-widest text-green-600">Verified Truth (Real)</label>
+            <div className="p-5 bg-green-50 rounded-3xl border border-green-100 text-sm font-bold text-green-900">
+              {claim.real_version}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-6 pt-6 border-t border-gray-100">
+          <div className="space-y-2">
+            <h4 className="text-xs font-black uppercase tracking-widest text-gray-400">Scientific Evidence</h4>
+            <p className="text-sm text-gray-600 leading-relaxed">{claim.climate_evidence}</p>
+          </div>
+          <div className="space-y-2">
+            <h4 className="text-xs font-black uppercase tracking-widest text-gray-400">News Reports Found</h4>
+            <p className="text-sm text-gray-600 leading-relaxed">{claim.news_evidence}</p>
+          </div>
+        </div>
+
+        <button 
+          onClick={onClose}
+          className="w-full bg-gray-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-gray-800 transition-all"
+        >
+          Close Report
+        </button>
+      </div>
+    </div>
+  </div>
+);
 
 const StatCard = ({ title, value, color, icon, footer }) => (
   <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-2">
